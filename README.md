@@ -33,7 +33,7 @@ This is a high-performance, mobile-first, responsive web application built with 
   - No horizontal page scroll at any width. Wide content, such as sales report tables, scrolls inside its own container or turns into stacked cards on small screens.
   - Touch targets are at least 44×44px. Don't rely on hover for essential actions.
   - Check each new page at phone, tablet and desktop widths before calling it done.
-- **Auth behavior.** Auto sign-in after email verification is **disabled**: users log in manually after verifying. Custom user fields `firstName` and `lastName` are set at registration. The admin plugin is enabled (`role`, ban fields, impersonation). Only email domains listed in `AUTH_ALLOWED_EMAIL_DOMAINS` can self-register; admins can create any user.
+- **Auth behavior.** Auto sign-in after email verification is **disabled**: users log in manually after verifying. Custom user fields `firstName` and `lastName` are required at registration (and when an admin creates a user); a database trigger keeps `name` set to "firstName lastName". The admin plugin is enabled (`role`, ban fields, impersonation). Only email domains listed in `AUTH_ALLOWED_EMAIL_DOMAINS` can self-register; admins can create any user.
 
 ### Security
 
@@ -41,13 +41,14 @@ The app runs on a public URL and reads business data, so the kit ships these def
 
 - **No indexing.** `next.config.ts` sends `X-Robots-Tag: noindex, nofollow, noarchive, nosnippet` on every response, and `app/robots.ts` serves `Disallow: /`. Both only stop well-behaved crawlers. Scanners and credential-stuffing bots ignore them, so they are not protection.
 - **Sign-up allowlist.** A Better Auth `before` hook in `lib/auth.ts` rejects `/sign-up/email` unless the email's domain exactly matches an entry in `AUTH_ALLOWED_EMAIL_DOMAINS` (parsed by `lib/auth-allowlist.ts`). An empty list means nobody can self-register. Don't add public providers like `@gmail.com`: that opens sign-up to anyone. Adding social providers or `user.changeEmail` means extending the check.
+- **Rate limiting** (`lib/auth.ts`). Better Auth counts requests per client IP and endpoint, stored in the `rateLimit` table: 100 per minute by default, 5 for sign-in, and 3 for sign-up and for each endpoint that sends an email (password reset, verification). Only requests through the `/api/auth` route count, so sign-in, sign-up and reset forms must use `authClient`, never a server action calling `auth.api.*` (a rule in `AGENTS.md`). `npm run db:cleanup` deletes stale rate-limit rows and expired sessions and verification tokens; schedule it daily.
 - **Security headers** (`next.config.ts`): HSTS, `Referrer-Policy: no-referrer` (verification and reset links carry tokens), `X-Frame-Options: DENY`, `nosniff`, a restrictive `Permissions-Policy`, a CSP without `script-src` (`frame-ancestors`, `base-uri`, `form-action`, `object-src`), and `poweredByHeader: false`. A nonce-based script CSP is left out because it makes every page render dynamically.
 - **No caching of business data.** Pages that call `getSession()` render dynamically and are sent with `no-store`. Don't put business data behind `"use cache"` or static rendering.
 - **Diagnostics are admin-only.** `diagnosticActionClient` rejects non-admin sessions and returns raw error text only outside production.
 
 Not covered by the kit, and worth doing before going live:
 
-- A network gate in front of the app (Cloudflare Access, a VPN or Tailscale, or at least a WAF with bot protection). If you add a proxy, set Better Auth's `advanced.ipAddress.ipAddressHeaders` so rate limiting sees real client IPs.
+- A network gate in front of the app (Cloudflare Access, a VPN or Tailscale, or at least a WAF with bot protection). Rate limiting reads the client IP from `x-forwarded-for`, which is only trustworthy when a proxy overwrites it (Vercel does). Behind another proxy, uncomment `advanced.ipAddress.ipAddressHeaders` in `lib/auth.ts` and name the header it sets (e.g. `cf-connecting-ip`). On a server exposed directly, clients can fake the header and skip the limits.
 - A least-privilege business database user for the app (SELECT on the tables or views it needs), and database ports firewalled to the app server.
 - Logging and alerts on failed sign-ins.
 
@@ -70,7 +71,8 @@ Not covered by the kit, and worth doing before going live:
 app/
   layout.tsx          Root layout: fonts (Inter, Geist Mono) and ThemeProvider
   globals.css         Tailwind imports, theme tokens (CSS variables), dark variant
-  (auth)/             Public auth pages: login, registro, email verification, password reset
+  (auth)/             Public auth pages: iniciar-sesion, registro, verificar-correo,
+                      recuperar-contrasena, restablecer-contrasena (see Routes)
   (main)/             Protected dashboard and feature modules
     admin/            User management (admin only)
     bds/              Database tools: explorador (schema browser), consultas (SQL runner),
@@ -90,12 +92,29 @@ lib/
   safe-action.ts      actionClient / diagnosticActionClient (admin-only)
   db/                 mysql.ts, postgres.ts, mssql.ts, db-types.ts
 db/                   SQL: auth schema, read-only agent users
-scripts/              db:setup and db:check-* (plain node)
+scripts/              db:setup, db:cleanup and db:check-* (plain node)
 tests/                Vitest unit tests
 docs/                 Design notes and testing reports
 ```
 
 App code imports with the `@/` alias, e.g. `@/components/ui/button`. Server code imports `@/lib/auth`; client code imports `@/lib/auth-client`, never the other way round.
+
+### Routes
+
+Page URLs are Spanish, ASCII and kebab-case. `ñ` becomes `n` and accents are dropped, as in `contrasena`. The auth pages live in `app/(auth)/`:
+
+| Route                               | Page                                     | Reached from                                                          |
+| :---------------------------------- | :--------------------------------------- | :-------------------------------------------------------------------- |
+| `/iniciar-sesion`                   | Sign in                                  | Guards in protected pages: `redirect("/iniciar-sesion")`              |
+| `/registro`                         | Self-registration (allowlisted domains)  | Link from `/iniciar-sesion`                                           |
+| `/verificar-correo?token=…`         | Confirms the email address               | Verification email (`sendVerificationEmail` in `lib/auth.ts`)         |
+| `/recuperar-contrasena`             | Asks for a password-reset email          | "¿Olvidaste tu contraseña?" link on `/iniciar-sesion`                 |
+| `/restablecer-contrasena?token=…`   | Sets a new password                      | Password-reset email (`sendResetPassword` in `lib/auth.ts`)           |
+
+- **The email links are built in `lib/auth.ts`**, from `NEXT_PUBLIC_APP_URL`, the page path and the token. If you rename `verificar-correo` or `restablecer-contrasena`, change the link there too, or the emails will point to a 404.
+- **`/verificar-correo`** reads `token` and calls `authClient.verifyEmail({ query: { token } })`. Auto sign-in is off, so on success it links to `/iniciar-sesion`.
+- **`/restablecer-contrasena`** reads `token` and calls `authClient.resetPassword({ newPassword, token })`. An invalid or expired token only shows up when the form is submitted, so show Better Auth's error and link back to `/recuperar-contrasena`.
+- **Better Auth's own endpoints keep their English paths** under `/api/auth/*` (`/sign-in/email`, `/request-password-reset`, …). They are API routes, not pages, and the rate-limit rules and sign-up hook in `lib/auth.ts` match those exact paths, so don't translate them.
 
 ### Forms
 
@@ -144,7 +163,7 @@ If a deployment ever breaks one of these, bring back a WebSocket module on the p
 | `lib/db/*`                                            | `lib/db/`                                                                     | Database connection modules                                |
 | `db/auth_schema.sql`                                  | `db/`                                                                         | Better Auth schema for Neon                                |
 | `db/readonly-users.sql`                               | `db/`                                                                         | SELECT-only users, only needed if you add a database MCP   |
-| `scripts/*`                                           | `scripts/`                                                                    | `db:setup` and the `db:check-*` smoke checks               |
+| `scripts/*`                                           | `scripts/`                                                                    | `db:setup`, `db:cleanup` and the `db:check-*` smoke checks  |
 | `tests/`, `vitest.config.ts`                          | project root                                                                  | Unit tests for the db modules and the sign-up allowlist    |
 | `.env.example`                                        | project root, then `cp .env.example .env.local`                               | All environment variables                                  |
 | `templates/AGENTS.md`                                 | append to `AGENTS.md`, below the Next.js block                                | Always-loaded project rules                                |
@@ -217,6 +236,7 @@ Add to `package.json`:
   "test": "vitest run",
   "test:watch": "vitest",
   "db:setup": "node --env-file-if-exists=.env.local scripts/setup-db.ts",
+  "db:cleanup": "node --env-file-if-exists=.env.local scripts/cleanup-auth.ts",
   "db:check": "node --env-file-if-exists=.env.local scripts/check-db.ts",
   "db:check-postgres": "node --env-file-if-exists=.env.local scripts/check-postgres.ts",
   "db:check-mysql": "node --env-file-if-exists=.env.local scripts/check-mysql.ts",
@@ -249,6 +269,7 @@ npm run format             # Prettier (with Tailwind CSS plugin)
 npm run typecheck          # TypeScript
 npm test                   # Vitest unit tests (no database needed)
 npm run db:setup           # Apply db/auth_schema.sql to Neon (idempotent)
+npm run db:cleanup         # Delete stale rate-limit rows, expired sessions/tokens (run daily)
 npm run db:check           # Smoke-check every configured database
 npm run db:check-postgres  # lib/db/postgres.ts (direct Neon endpoint, Better Auth)
 npm run db:check-mysql     # lib/db/mysql.ts

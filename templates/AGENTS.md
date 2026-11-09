@@ -10,6 +10,7 @@
 ### Language and routes
 - Every user-facing string is **Spanish**: UI, emails, validation and error messages, toasts, form labels.
 - Route paths are Spanish, ASCII, kebab-case, no accents (`reportes-ventas`, not `sales-reports` or `facturación`).
+- Auth pages: `/iniciar-sesion`, `/registro`, `/verificar-correo`, `/recuperar-contrasena`, `/restablecer-contrasena`. The email links in `lib/auth.ts` point at the last two pages' paths. Better Auth's `/api/auth/*` endpoints stay in English.
 - Code identifiers, comments and commit messages stay in English.
 
 ### Mobile-first
@@ -19,6 +20,7 @@
 
 ### Architecture
 - Better Auth on Neon Postgres owns identity, sessions and tokens **only**. Don't query auth tables directly; use `auth.api.*` / `getSession()` from `lib/session.ts`. Server code imports `@/lib/auth`; client components import `@/lib/auth-client`.
+- Sign-in, sign-up, password reset and verification emails always go through `authClient` (the `/api/auth` route), never a server action calling `auth.api.*`: server-side calls skip rate limiting.
 - Business data lives in MySQL (`lib/db/mysql.ts`) and/or SQL Server (`lib/db/mssql.ts`). No ORM. Always use placeholders (skill: `db-query`).
 - Forms: Zod v4 schema + react-hook-form + next-safe-action `actionClient` (skill: `server-action-form`). `diagnosticActionClient` is admin-only, for internal diagnostics.
 - Every server action re-checks the session/role.

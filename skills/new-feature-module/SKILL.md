@@ -31,7 +31,7 @@ At the top of `page.tsx`:
 
 ```ts
 const session = await getSession()          // from @/lib/session
-if (!session) redirect("/login")
+if (!session) redirect("/iniciar-sesion")
 // role-restricted:
 if (session.user.role !== "admin") notFound()
 ```
