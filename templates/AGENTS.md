@@ -18,7 +18,7 @@
 - A UI change is not done until checked at phone, tablet and desktop widths (skill: `responsive-check`).
 
 ### Architecture
-- Better Auth on Neon Postgres owns identity, sessions and tokens **only**. Don't query auth tables directly; use `auth.api.*` / `getSession()` from `lib/session.ts`.
+- Better Auth on Neon Postgres owns identity, sessions and tokens **only**. Don't query auth tables directly; use `auth.api.*` / `getSession()` from `lib/session.ts`. Server code imports `@/lib/auth`; client components import `@/lib/auth-client`.
 - Business data lives in MySQL (`lib/db/mysql.ts`) and/or SQL Server (`lib/db/mssql.ts`). No ORM. Always use placeholders (skill: `db-query`).
 - Forms: Zod v4 schema + react-hook-form + next-safe-action `actionClient` (skill: `server-action-form`). `diagnosticActionClient` is for internal diagnostics only.
 - Every server action re-checks the session/role.
