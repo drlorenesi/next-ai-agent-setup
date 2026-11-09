@@ -42,7 +42,7 @@ This is a high-performance, mobile-first, responsive web application built with 
 | Framework            | Next.js 16.4 (App Router, RSC), React 19.3                                            | Node.js runtime (container, VM, or Vercel Fluid compute) | Version-matched docs via the `AGENTS.md` block that `next dev` manages |
 | UI & styling         | shadcn/ui (`base-mira` style, on Base UI), Tailwind CSS v4, lucide-react, next-themes | Local component registry                                 | Official shadcn **skill**; semantic CSS tokens                         |
 | Forms                | Zod v4 + react-hook-form + next-safe-action                                           | n/a                                                      | next-safe-action **skills** + the kit's `server-action-form` skill     |
-| Authentication       | Better Auth                                                                           | Neon Postgres (direct endpoint)                          | Isolated. No MCP; `npm run db:check-postgres` or `psql` for checks     |
+| Authentication       | Better Auth                                                                           | Neon Postgres (direct endpoint)                          | Better Auth **skills**. Isolated: no MCP; `npm run db:check-postgres` or `psql` for checks |
 | Business data        | Raw SQL via `mysql2` / `mssql`                                                        | Railway MySQL and/or local SQL Server                    | Kit's `db-query` **skill**; optional read-only database **MCP**        |
 | Compilation checks   | Next.js dev server (`/_next/mcp`)                                                     | Local (`next dev`)                                       | Used by the `next-dev-loop` skill; optional Next.js DevTools **MCP**   |
 | Runtime verification | agent-browser + `next-dev-loop`                                                       | Local (global npm install)                               | The agent drives a real browser: DOM, console, network, React tree     |
@@ -300,9 +300,20 @@ npx skills add vercel/next.js --skill next-dev-loop
 # next-safe-action: typed server action clients (this stack uses it in
 # lib/safe-action.ts).
 npx skills add next-safe-action/skills
+
+# Better Auth official skills: server/client config, sessions, plugins,
+# email verification and security (https://better-auth.com/docs/ai-resources/skills)
+npx skills add better-auth/skills
 ```
 
 From the next-safe-action pack, the relevant skills are `safe-action-client`, `safe-action-middleware`, `safe-action-forms`, `safe-action-validation-errors` and `safe-action-better-auth`. Skip `safe-action-tanstack-query` unless TanStack Query joins the stack.
+
+From the Better Auth pack:
+
+- **Relevant every day:** `better-auth-best-practices` (config, sessions, plugins, env vars), `email-and-password-best-practices` (verification, password reset, hashing) and `better-auth-security-best-practices` (rate limiting, trusted origins, cookies, secrets).
+- **Only if you adopt the plugin:** `organization-best-practices` and `two-factor-authentication-best-practices`. They stay idle until a task mentions organizations or 2FA.
+- **Not for this kit:** `create-auth` scaffolds a new auth setup and writes its own `lib/auth.ts`. The kit already ships one, so reject any plan from it that replaces `lib/auth.ts`.
+- **Schema changes:** these skills tell the agent to run `npx auth@latest migrate` after config or plugin changes. In this kit the auth schema lives in `db/auth_schema.sql` and is applied with `npm run db:setup`, and the rule in `AGENTS.md` makes the agent follow that path instead. To find the SQL a new plugin needs, run `npx auth@latest generate` and copy its output into `db/auth_schema.sql`, rather than migrating directly.
 
 Optional general-purpose skills:
 
@@ -364,6 +375,7 @@ description: Write SQL against the app's databases using the lib/db modules ... 
 | Next.js DevTools      | You want quick compile checks _outside_ the `next-dev-loop` skill                      | Not installed     |
 | shadcn                | Temporarily, during UI-heavy phases with a lot of component shopping                   | Not installed     |
 | Neon                  | Practically never; see below                                                           | **Don't install** |
+| Better Auth docs      | Rarely: the Better Auth skills cover conventions, and `better-auth.com/llms.txt` covers lookups | Not installed |
 
 ### Business database (MySQL / SQL Server), read-only
 

@@ -29,3 +29,4 @@
 - `npm run db:check` diagnoses database connectivity before you debug query code.
 - Never edit `.env.local` or print secrets; add new variables to `.env.example` with a comment.
 - Ask before adding a dependency, changing `lib/db/*` pool settings, or touching `db/auth_schema.sql`.
+- Auth schema changes go into `db/auth_schema.sql` and are applied with `npm run db:setup`. Never run `npx auth migrate` (the Better Auth skills suggest it); use `npx auth generate` only to see the SQL a plugin needs.
