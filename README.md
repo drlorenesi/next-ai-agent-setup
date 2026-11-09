@@ -33,7 +33,23 @@ This is a high-performance, mobile-first, responsive web application built with 
   - No horizontal page scroll at any width. Wide content, such as sales report tables, scrolls inside its own container or turns into stacked cards on small screens.
   - Touch targets are at least 44×44px. Don't rely on hover for essential actions.
   - Check each new page at phone, tablet and desktop widths before calling it done.
-- **Auth behavior.** Auto sign-in after email verification is **disabled**: users log in manually after verifying. Custom user fields `firstName` and `lastName` are set at registration. The admin plugin is enabled (`role`, ban fields, impersonation).
+- **Auth behavior.** Auto sign-in after email verification is **disabled**: users log in manually after verifying. Custom user fields `firstName` and `lastName` are set at registration. The admin plugin is enabled (`role`, ban fields, impersonation). Only email domains listed in `AUTH_ALLOWED_EMAIL_DOMAINS` can self-register; admins can create any user.
+
+### Security
+
+The app runs on a public URL and reads business data, so the kit ships these defaults:
+
+- **No indexing.** `next.config.ts` sends `X-Robots-Tag: noindex, nofollow, noarchive, nosnippet` on every response, and `app/robots.ts` serves `Disallow: /`. Both only stop well-behaved crawlers. Scanners and credential-stuffing bots ignore them, so they are not protection.
+- **Sign-up allowlist.** A Better Auth `before` hook in `lib/auth.ts` rejects `/sign-up/email` unless the email's domain exactly matches an entry in `AUTH_ALLOWED_EMAIL_DOMAINS` (parsed by `lib/auth-allowlist.ts`). An empty list means nobody can self-register. Don't add public providers like `@gmail.com`: that opens sign-up to anyone. Adding social providers or `user.changeEmail` means extending the check.
+- **Security headers** (`next.config.ts`): HSTS, `Referrer-Policy: no-referrer` (verification and reset links carry tokens), `X-Frame-Options: DENY`, `nosniff`, a restrictive `Permissions-Policy`, a CSP without `script-src` (`frame-ancestors`, `base-uri`, `form-action`, `object-src`), and `poweredByHeader: false`. A nonce-based script CSP is left out because it makes every page render dynamically.
+- **No caching of business data.** Pages that call `getSession()` render dynamically and are sent with `no-store`. Don't put business data behind `"use cache"` or static rendering.
+- **Diagnostics are admin-only.** `diagnosticActionClient` rejects non-admin sessions and returns raw error text only outside production.
+
+Not covered by the kit, and worth doing before going live:
+
+- A network gate in front of the app (Cloudflare Access, a VPN or Tailscale, or at least a WAF with bot protection). If you add a proxy, set Better Auth's `advanced.ipAddress.ipAddressHeaders` so rate limiting sees real client IPs.
+- A least-privilege business database user for the app (SELECT on the tables or views it needs), and database ports firewalled to the app server.
+- Logging and alerts on failed sign-ins.
 
 ### Tech stack
 
@@ -70,7 +86,8 @@ lib/
   auth-client.ts      Better Auth client (client components only)
   session.ts          Cached getSession()
   email.ts            Nodemailer transport + Spanish verification/reset emails
-  safe-action.ts      actionClient / diagnosticActionClient
+  auth-allowlist.ts   Sign-up email-domain allowlist
+  safe-action.ts      actionClient / diagnosticActionClient (admin-only)
   db/                 mysql.ts, postgres.ts, mssql.ts, db-types.ts
 db/                   SQL: auth schema, read-only agent users
 scripts/              db:setup and db:check-* (plain node)
@@ -85,7 +102,7 @@ App code imports with the `@/` alias, e.g. `@/components/ui/button`. Server code
 Forms live next to their page as a separate `*-form.tsx` client component: a shared Zod schema, `useForm` with `Controller` for complex inputs (date pickers, checkboxes), and an action built on `actionClient` from `lib/safe-action.ts` that re-checks the session. Labels and validation messages are in Spanish. `lib/safe-action.ts` has two clients:
 
 - `actionClient`: user-facing. It returns a generic Spanish error.
-- `diagnosticActionClient`: internal diagnostics only. It passes the real error through.
+- `diagnosticActionClient`: internal diagnostics only. Admin-only; it passes the real error through outside production and the generic message in production.
 
 The full pattern is in the `server-action-form` skill.
 
@@ -120,12 +137,15 @@ If a deployment ever breaks one of these, bring back a WebSocket module on the p
 | :---------------------------------------------------- | :---------------------------------------------------------------------------- | :--------------------------------------------------------- |
 | `lib/auth.ts`, `lib/auth-client.ts`, `lib/session.ts` | `lib/`                                                                        | Better Auth server/client config and cached `getSession()` |
 | `lib/email.ts`                                        | `lib/`                                                                        | Nodemailer transport + Spanish verification/reset emails   |
+| `lib/auth-allowlist.ts`                               | `lib/`                                                                        | Sign-up email-domain allowlist (used by `lib/auth.ts`)     |
 | `lib/safe-action.ts`                                  | `lib/`                                                                        | `actionClient` / `diagnosticActionClient`                  |
+| `app/robots.ts`                                       | `app/`                                                                        | `robots.txt` asking all crawlers to stay out               |
+| `templates/next.config.ts`                            | `next.config.ts` (replaces the scaffold's)                                    | Security headers, `X-Robots-Tag`, `poweredByHeader: false` |
 | `lib/db/*`                                            | `lib/db/`                                                                     | Database connection modules                                |
 | `db/auth_schema.sql`                                  | `db/`                                                                         | Better Auth schema for Neon                                |
 | `db/readonly-users.sql`                               | `db/`                                                                         | SELECT-only users, only needed if you add a database MCP   |
 | `scripts/*`                                           | `scripts/`                                                                    | `db:setup` and the `db:check-*` smoke checks               |
-| `tests/`, `vitest.config.ts`                          | project root                                                                  | Unit tests for the db modules                              |
+| `tests/`, `vitest.config.ts`                          | project root                                                                  | Unit tests for the db modules and the sign-up allowlist    |
 | `.env.example`                                        | project root, then `cp .env.example .env.local`                               | All environment variables                                  |
 | `templates/AGENTS.md`                                 | append to `AGENTS.md`, below the Next.js block                                | Always-loaded project rules                                |
 | `templates/CLAUDE.md`                                 | `CLAUDE.md`                                                                   | Claude Code entry point (`@AGENTS.md`)                     |
@@ -162,6 +182,7 @@ mkdir -p lib/db db scripts tests .claude/skills docs
 cp -R $KIT/lib/. lib/ && cp -R $KIT/db/. db/ && cp -R $KIT/scripts/. scripts/
 cp -R $KIT/tests/. tests/ && cp $KIT/vitest.config.ts . && cp -R $KIT/docs/. docs/
 cp $KIT/.env.example . && cp .env.example .env.local
+cp $KIT/app/robots.ts app/ && cp $KIT/templates/next.config.ts next.config.ts
 cp -R $KIT/skills/. .claude/skills/
 cat $KIT/templates/AGENTS.md >> AGENTS.md
 cp $KIT/templates/CLAUDE.md CLAUDE.md
@@ -469,7 +490,7 @@ Two layers answer different questions:
 
 | Layer               | Command            | Needs a DB?            | Answers                                                                                                                                                         |
 | :------------------ | :----------------- | :--------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Unit tests (Vitest) | `npm test`         | No: drivers are mocked | Is each module configured correctly? (env validation, TLS options, pool sizing, precision flags, singleton/HMR behavior, timeout and release paths, `runQuery`) |
+| Unit tests (Vitest) | `npm test`         | No: drivers are mocked | Is each module configured correctly? (env validation, TLS options, pool sizing, precision flags, singleton/HMR behavior, timeout and release paths, `runQuery`, sign-up allowlist) |
 | Smoke checks        | `npm run db:check` | Yes: uses `.env.local` | Does it work against the real server? (connectivity, version, BIGINT precision, session timeouts and app name, pool concurrency, acquire timeout)               |
 
 - Run `npm test` after any change in `lib/`. Run `npm run db:check` on a new machine, after changing `.env.local`, or before debugging "the query is broken", because the cause is often the connection.

@@ -1,11 +1,16 @@
 import { betterAuth } from "better-auth"
+import { APIError, createAuthMiddleware } from "better-auth/api"
 import { admin } from "better-auth/plugins"
+import { isEmailAllowed, parseAllowedDomains } from "@/lib/auth-allowlist"
 import { getPool } from "@/lib/db/postgres"
 import { sendVerificationEmail, sendResetEmail } from "@/lib/email"
 
 const extraOrigins = process.env.BETTER_AUTH_TRUSTED_ORIGINS
   ? process.env.BETTER_AUTH_TRUSTED_ORIGINS.split(",").map((o) => o.trim())
   : []
+
+// Email domains allowed to self-register. Empty = nobody can self-register.
+const allowedDomains = parseAllowedDomains(process.env.AUTH_ALLOWED_EMAIL_DOMAINS)
 
 export const auth = betterAuth({
   // Better Auth accepts a pg Pool directly. getPool() is the shared singleton
@@ -14,6 +19,22 @@ export const auth = betterAuth({
   baseURL: process.env.NEXT_PUBLIC_APP_URL,
   secret: process.env.BETTER_AUTH_SECRET,
   trustedOrigins: [process.env.NEXT_PUBLIC_APP_URL!, ...extraOrigins],
+
+  // Self-registration only for allowlisted domains (AUTH_ALLOWED_EMAIL_DOMAINS).
+  // Users created by an admin (admin plugin's createUser) skip this on purpose.
+  // Adding social providers or enabling user.changeEmail opens other ways to
+  // get an account or email in: extend this check to cover them.
+  hooks: {
+    before: createAuthMiddleware(async (ctx) => {
+      if (ctx.path !== "/sign-up/email") return
+      const email: unknown = ctx.body?.email
+      if (typeof email !== "string" || !isEmailAllowed(email, allowedDomains)) {
+        throw new APIError("FORBIDDEN", {
+          message: "Este correo no está autorizado para registrarse.",
+        })
+      }
+    }),
+  },
 
   rateLimit: {
     enabled: true,

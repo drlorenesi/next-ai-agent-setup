@@ -40,7 +40,7 @@ export const saveXxx = actionClient
   })
 ```
 
-- Use `actionClient` (generic Spanish error to the user). `diagnosticActionClient` passes raw error text through — **only** for internal diagnostics pages.
+- Use `actionClient` (generic Spanish error to the user). `diagnosticActionClient` is admin-only and passes raw error text through outside production — **only** for internal diagnostics pages.
 - Re-check auth/role inside every action. Never trust that the page guarded it.
 - After a mutation, `revalidatePath(...)` / `revalidateTag(...)` for any page that shows the changed data.
 - For field-level server errors (e.g. "ese correo ya existe"), use `returnValidationErrors(xxxSchema, { email: { _errors: ["..."] } })` from `next-safe-action`.

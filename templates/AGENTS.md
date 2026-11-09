@@ -20,8 +20,10 @@
 ### Architecture
 - Better Auth on Neon Postgres owns identity, sessions and tokens **only**. Don't query auth tables directly; use `auth.api.*` / `getSession()` from `lib/session.ts`. Server code imports `@/lib/auth`; client components import `@/lib/auth-client`.
 - Business data lives in MySQL (`lib/db/mysql.ts`) and/or SQL Server (`lib/db/mssql.ts`). No ORM. Always use placeholders (skill: `db-query`).
-- Forms: Zod v4 schema + react-hook-form + next-safe-action `actionClient` (skill: `server-action-form`). `diagnosticActionClient` is for internal diagnostics only.
+- Forms: Zod v4 schema + react-hook-form + next-safe-action `actionClient` (skill: `server-action-form`). `diagnosticActionClient` is admin-only, for internal diagnostics.
 - Every server action re-checks the session/role.
+- Never cache business data: no `"use cache"` or static rendering for pages or functions that read it.
+- Self-registration is limited to `AUTH_ALLOWED_EMAIL_DOMAINS` (hook in `lib/auth.ts`). Adding a social provider or email change must extend that check.
 - Imports use the `@/` alias.
 
 ### Workflow
