@@ -1,9 +1,9 @@
 import sql from "mssql"
 import { z } from "zod"
-import { formatCell, type QueryOutcome } from "./db-types"
+import { formatCell, type QueryOutcome } from "./db-types.ts"
 
 // mssql is a CommonJS package without named ESM exports. Under native ESM
-// ("type": "module", e.g. the tsx-run db:check scripts) only the default import
+// ("type": "module", e.g. the db:check scripts) only the default import
 // resolves; `import { ConnectionPool } from "mssql"` throws at load time.
 const { ConnectionPool } = sql
 type ConnectionPool = sql.ConnectionPool

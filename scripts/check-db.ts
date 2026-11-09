@@ -3,10 +3,10 @@
 // Usage: npm run db:check
 import { spawnSync } from "node:child_process"
 import { join } from "node:path"
-import { bold, dim, green, missingEnv, red } from "./_check-utils"
+import { bold, dim, green, missingEnv, red } from "./_check-utils.ts"
 
 // `env` = the vars that signal "this database is in use". HOST/PORT are left out
-// because env.example pre-fills them with defaults.
+// because .env.example pre-fills them with defaults.
 const CHECKS = [
   { script: "check-postgres.ts", label: "PostgreSQL (direct)", env: ["DATABASE_URL"] },
   { script: "check-mysql.ts", label: "MySQL", env: ["MYSQL_DATABASE", "MYSQL_USER", "MYSQL_PASSWORD"] },
@@ -22,8 +22,8 @@ for (const check of CHECKS) {
     continue
   }
   // Partially configured: run anyway so the module reports exactly what's missing.
-  // `npx tsx` resolves the project-local tsx.
-  const result = spawnSync("npx", ["tsx", join("scripts", check.script)], {
+  // Same Node binary as this process; .env.local is already in process.env.
+  const result = spawnSync(process.execPath, [join("scripts", check.script)], {
     stdio: "inherit",
     env: process.env,
   })
@@ -38,7 +38,7 @@ for (const s of summary) {
 }
 
 if (summary.every((s) => s.status === "skip")) {
-  console.log(red("\nNo databases configured in .env.local (see env.example)."))
+  console.log(red("\nNo databases configured in .env.local (see .env.example)."))
   process.exitCode = 1
 } else if (summary.some((s) => s.status === "fail")) {
   process.exitCode = 1

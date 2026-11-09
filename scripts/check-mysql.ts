@@ -1,12 +1,12 @@
 // Smoke-check lib/db/mysql.ts against the database in .env.local.
 // Usage: npm run db:check-mysql
-import * as db from "../lib/db/mysql"
+import * as db from "../lib/db/mysql.ts"
 import {
   CheckWarning,
   checkAcquireTimeout,
   expect,
   runChecks,
-} from "./_check-utils"
+} from "./_check-utils.ts"
 
 async function main() {
   const { MYSQL_HOST, MYSQL_PORT, MYSQL_DATABASE } = process.env

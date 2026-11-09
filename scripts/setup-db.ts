@@ -3,8 +3,8 @@
 // (IF NOT EXISTS / CREATE OR REPLACE / DROP TRIGGER IF EXISTS), so re-running
 // this script is safe.
 //
-// Runs on plain Node (built-in type stripping, Node >= 22.18) with no tsx, so
-// it must not import from lib/ and may only use erasable TypeScript syntax.
+// Runs on plain Node (built-in type stripping, Node >= 22.18), so it may only
+// use erasable TypeScript syntax.
 // `.env.local` is loaded by `node --env-file-if-exists` in the npm script.
 //
 // Usage: npm run db:setup

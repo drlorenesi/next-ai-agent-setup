@@ -1,6 +1,6 @@
 // Shared helpers for the `npm run db:check-*` smoke-check scripts.
 //
-// `.env.local` is loaded by the npm script (`tsx --env-file-if-exists=.env.local`)
+// `.env.local` is loaded by the npm script (`node --env-file-if-exists=.env.local`)
 // before any module is evaluated, so the check scripts can import their lib/db
 // module statically.
 
@@ -154,7 +154,7 @@ function hintFor(err: unknown): string | undefined {
   const e = err as { code?: string; message?: string }
   const msg = e?.message ?? ""
   if (/environment configuration/.test(msg))
-    return "Fill in the missing variables in .env.local (see env.example)."
+    return "Fill in the missing variables in .env.local (see .env.example)."
   switch (e?.code) {
     case "ECONNREFUSED":
       return "Nothing is listening at that host/port: is the server running (or paused on Railway)? Check HOST/PORT."

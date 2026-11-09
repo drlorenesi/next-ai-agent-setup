@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import { captureSignalHandlers, setEnv } from "./_helpers"
+import { captureSignalHandlers, setEnv } from "./_helpers.ts"
 
 // ── Driver mock: capture the config passed to new ConnectionPool ────────────
 const mocks = vi.hoisted(() => ({

@@ -1,13 +1,13 @@
 // Smoke-check lib/db/postgres.ts (direct TCP pool, DATABASE_URL) against the
 // database in .env.local. This is the pool Better Auth uses.
 // Usage: npm run db:check-postgres
-import * as db from "../lib/db/postgres"
+import * as db from "../lib/db/postgres.ts"
 import {
   CheckWarning,
   checkAcquireTimeout,
   expect,
   runChecks,
-} from "./_check-utils"
+} from "./_check-utils.ts"
 
 function describeUrl(url: string | undefined) {
   try {

@@ -37,7 +37,7 @@ This repository is a guide plus the files to drop into a freshly scaffolded app.
 | `db/readonly-users.sql`                               | `db/`                                                            | SELECT-only users for the agent's database MCP                          |
 | `scripts/*`                                           | `scripts/`                                                       | `db:setup` and the `db:check-*` smoke checks                            |
 | `tests/`, `vitest.config.ts`                          | project root                                                     | Unit tests for the db modules                                           |
-| `env.example`                                         | project root, then `cp env.example .env.local`                   | All environment variables                                               |
+| `.env.example`                                        | project root, then `cp .env.example .env.local`                  | All environment variables                                               |
 | `templates/AGENTS.md`                                 | append to `AGENTS.md` (below the Next.js block)                  | Always-loaded project rules                                             |
 | `templates/CLAUDE.md`                                 | `CLAUDE.md` (if not already importing `AGENTS.md`)               | Claude Code entry point                                                 |
 | `templates/mcp.json`                                  | `.mcp.json` (Claude Code) or your agent's MCP config             | Database MCP config                                                     |
@@ -50,7 +50,7 @@ KIT=../next-ai-agent-setup
 mkdir -p lib/db db scripts tests .claude/skills docs
 cp -R $KIT/lib/. lib/ && cp -R $KIT/db/. db/ && cp -R $KIT/scripts/. scripts/
 cp -R $KIT/tests/. tests/ && cp $KIT/vitest.config.ts . && cp -R $KIT/docs/. docs/
-cp $KIT/env.example . && cp env.example .env.local
+cp $KIT/.env.example . && cp .env.example .env.local
 cp -R $KIT/skills/. .claude/skills/
 cp $KIT/templates/mcp.json .mcp.json
 cat $KIT/templates/AGENTS.md >> AGENTS.md
@@ -69,15 +69,17 @@ npx shadcn@latest add form input button
 
 # 3. Add dependencies
 npm install @hookform/resolvers better-auth zod pg mysql2 mssql next-safe-action nodemailer
-npm install -D @types/pg @types/mssql @types/nodemailer tsx vitest
+npm install -D @types/pg @types/mssql @types/nodemailer vitest
 
 # 4. Copy the kit files (see "What This Kit Contains"), fill in .env.local,
 #    add "type", "engines" and the scripts from "Commands" to package.json,
-#    then create the auth schema:
+#    add "allowImportingTsExtensions": true to tsconfig.json compilerOptions
+#    (see "Script conventions"), then create the auth schema:
 npm run db:setup && npm run db:check
 
 # 5. Setup Git
 git init
+git add .
 git commit -m "Initial commit."
 git remote add origin https://github.com/drlorenesi/project-name.git
 git branch -M main
@@ -122,10 +124,10 @@ Add these to `package.json`:
   "test": "vitest run",
   "test:watch": "vitest",
   "db:setup": "node --env-file-if-exists=.env.local scripts/setup-db.ts",
-  "db:check": "tsx --env-file-if-exists=.env.local scripts/check-db.ts",
-  "db:check-postgres": "tsx --env-file-if-exists=.env.local scripts/check-postgres.ts",
-  "db:check-mysql": "tsx --env-file-if-exists=.env.local scripts/check-mysql.ts",
-  "db:check-mssql": "tsx --env-file-if-exists=.env.local scripts/check-mssql.ts"
+  "db:check": "node --env-file-if-exists=.env.local scripts/check-db.ts",
+  "db:check-postgres": "node --env-file-if-exists=.env.local scripts/check-postgres.ts",
+  "db:check-mysql": "node --env-file-if-exists=.env.local scripts/check-mysql.ts",
+  "db:check-mssql": "node --env-file-if-exists=.env.local scripts/check-mssql.ts"
 }
 ```
 
@@ -135,9 +137,9 @@ Add these to `package.json`:
 
 Scripts are TypeScript and use Node's built-in features instead of extra packages:
 
-- **Node runs TypeScript natively** (type stripping, on by default since Node 22.18). Scripts that don't import from `lib/` run with plain `node`, such as `db:setup`. These scripts may only use TypeScript syntax that can simply be deleted: no `enum`, no namespaces, no constructor parameter properties. `erasableSyntaxOnly` in `tsconfig.json` enforces this.
-- **Scripts that import `lib/` run with `tsx`.** That covers the `db:check-*` scripts. The `lib/` modules use extensionless relative imports (`from "./db-types"`), the Next.js bundler style, and plain Node can't resolve those. `tsx` can, and it also understands the `@/` alias.
-- **`.env.local` is loaded with `--env-file-if-exists`.** Node and `tsx` both accept this flag, so `dotenv` isn't needed. The file loads before any module runs, so scripts can import `lib/db` modules statically.
+- **Node runs TypeScript natively** (type stripping, on by default since Node 22.18). Every script runs with plain `node`, with no `tsx` or `ts-node`. Scripts and the `lib/` modules they import may only use TypeScript syntax that can simply be deleted: no `enum`, no namespaces, no constructor parameter properties. `erasableSyntaxOnly` in `tsconfig.json` enforces this.
+- **Relative imports include the `.ts` extension** (`from "./db-types.ts"`). Node doesn't guess extensions, so this is what lets the `db:check-*` scripts import `lib/db` directly. Add `"allowImportingTsExtensions": true` to the app's `tsconfig.json` so TypeScript accepts it; Next.js already sets `noEmit`, which this option requires. Plain Node doesn't understand the `@/` alias, so code that scripts import must use relative paths.
+- **`.env.local` is loaded with `--env-file-if-exists`.** It's built into Node, so `dotenv` isn't needed. The file loads before any module runs, so scripts can import `lib/db` modules statically.
 - **No `.mjs` / `.mts` for scripts.** `"type": "module"` in `package.json` makes plain `.ts`/`.js` files ES modules, so the extension doesn't need to say so. Use `import.meta.dirname` instead of the `fileURLToPath(import.meta.url)` workaround.
 - **Node's type stripping doesn't type-check.** `npm run typecheck` covers `scripts/` too.
 
@@ -151,7 +153,7 @@ Scripts are TypeScript and use Node's built-in features instead of extra package
 | Components | [shadcn/ui](https://ui.shadcn.com/) (`base-mira` style, built on Base UI)                                                                                                                                                                                                                         |
 | Icons      | [lucide-react](https://lucide.dev/)                                                                                                                                                                                                                                                               |
 | Theming    | [next-themes](https://github.com/pacocoursey/next-themes) (light / dark / system)                                                                                                                                                                                                                 |
-| Tooling    | TypeScript 6, ESLint 9, Prettier (with Tailwind class sorting), Vitest, tsx                                                                                                                                                                                                                       |
+| Tooling    | TypeScript 6, ESLint 9, Prettier (with Tailwind class sorting), Vitest                                                                                                                                                                                                                            |
 | Forms      | **Zod v4** + **react-hook-form** + **next-safe-action** for type-safe server actions and forms. Two action clients in `lib/safe-action.ts`: `actionClient` (user-facing, returns a generic Spanish error) and `diagnosticActionClient` (internal diagnostics only, passes the real error through) |
 | Database   | **mysql2**, **pg**, **mssql** for database access — see the Database modules section below                                                                                                                                                                                                        |
 | Auth       | https://better-auth.com/ - Custom user fields: `firstName`, `lastName` (set at registration, stored by Better Auth). Admin plugin enabled (`role`, ban fields, impersonation)                                                                                                                     |
@@ -170,7 +172,7 @@ Three TCP connection modules in `lib/db/` share the same pattern: lazy singleton
 | `lib/db/postgres.ts` | `getPool()`, `getConnection(ms?)`, `runQuery()`             | `DATABASE_URL`                           |
 | `lib/db/mssql.ts`    | `getPool()` **(async — must `await`)**, `runQuery()`        | `MSSQL_HOST/PORT/DATABASE/USER/PASSWORD` |
 
-SQL Server has no `getConnection()` helper — callers use `(await getPool()).request().query(...)` directly. See `env.example` for all required variables and optional SSL overrides.
+SQL Server has no `getConnection()` helper — callers use `(await getPool()).request().query(...)` directly. See `.env.example` for all required variables and optional SSL overrides.
 
 Every module also exports `runQuery(sql, params?)`, which returns the driver-agnostic `QueryOutcome` defined in `lib/db/db-types.ts` (`kind: "rows"` or `kind: "ok"`, every cell a `string | null`). See [docs/db-modules/query-abstraction.md](docs/db-modules/query-abstraction.md) for the design, and the testing reports in the same folder for each driver's provider quirks.
 
@@ -213,7 +215,7 @@ lib/
   auth.ts, auth-client.ts, session.ts, email.ts, safe-action.ts
   db/                 mysql.ts, postgres.ts, mssql.ts, db-types.ts
 db/                   SQL: auth schema, read-only agent users
-scripts/              db:setup (plain node) and db:check-* (tsx) scripts
+scripts/              db:setup and db:check-* scripts (plain node)
 tests/                Vitest unit tests
 docs/                 Design notes and testing reports
 public/               Static assets
@@ -343,7 +345,7 @@ Test it before trusting it. Ask the agent to run `INSERT`/`UPDATE` and `SELECT 1
 ### When the MCP is not the right tool
 
 - **"Does my connection work?"** → `npm run db:check`, not the MCP (the MCP uses different credentials).
-- **One-off question about a table** → if the MCP isn't configured, the agent can write a throwaway script using `runQuery` from `lib/db` and run it with `npx tsx --env-file=.env.local tmp.ts`. Delete it afterwards.
+- **One-off question about a table** → if the MCP isn't configured, the agent can write a throwaway script using `runQuery` from `lib/db` and run it with `node --env-file=.env.local tmp.ts` (relative `.ts` imports, no `@/` alias). Delete it afterwards.
 
 ## Daily Development Session Workflow
 

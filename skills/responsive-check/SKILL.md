@@ -15,7 +15,7 @@ Run this on every page you created or changed. Report findings per width; fix be
 | Tablet | 768 px | `md:` breakpoint |
 | Desktop | 1280 px | `lg:`/`xl:` |
 
-How to view them: browser devtools device toolbar, or a browser-automation tool if the agent has one. For a real phone on the LAN, set `BETTER_AUTH_TRUSTED_ORIGINS` (see env.example) and open `http://<LAN-IP>:3000`.
+How to view them: browser devtools device toolbar, or a browser-automation tool if the agent has one. For a real phone on the LAN, set `BETTER_AUTH_TRUSTED_ORIGINS` (see .env.example) and open `http://<LAN-IP>:3000`.
 
 ## Checklist (each width)
 

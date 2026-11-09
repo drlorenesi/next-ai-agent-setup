@@ -13,7 +13,7 @@
 
 import { Pool, type PoolClient, type PoolConfig } from "pg"
 import { z } from "zod"
-import { formatCell, type QueryOutcome } from "./db-types"
+import { formatCell, type QueryOutcome } from "./db-types.ts"
 
 declare global {
   var __pgPool: Pool | undefined

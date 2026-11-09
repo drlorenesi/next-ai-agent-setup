@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import { captureSignalHandlers, deferred, setEnv } from "./_helpers"
+import { captureSignalHandlers, deferred, setEnv } from "./_helpers.ts"
 
 // ── Driver mock: capture the options passed to new pg.Pool ──────────────────
 const mocks = vi.hoisted(() => ({

@@ -1,7 +1,7 @@
 // Smoke-check lib/db/mssql.ts against the SQL Server in .env.local.
 // Usage: npm run db:check-mssql
-import * as db from "../lib/db/mssql"
-import { CheckWarning, expect, runChecks } from "./_check-utils"
+import * as db from "../lib/db/mssql.ts"
+import { CheckWarning, expect, runChecks } from "./_check-utils.ts"
 
 async function main() {
   const { MSSQL_HOST, MSSQL_PORT, MSSQL_DATABASE } = process.env

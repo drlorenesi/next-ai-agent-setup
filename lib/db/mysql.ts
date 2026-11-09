@@ -14,7 +14,7 @@ import mysql, {
   type PoolOptions,
 } from "mysql2/promise"
 import { z } from "zod"
-import { formatCell, type QueryOutcome } from "./db-types"
+import { formatCell, type QueryOutcome } from "./db-types.ts"
 
 declare global {
   var __dbPool: Pool | undefined

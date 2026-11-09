@@ -15,6 +15,9 @@
     "isolatedModules": true,
     "verbatimModuleSyntax": true,
     "erasableSyntaxOnly": true,
+    // Relative imports carry the `.ts` extension so plain `node` can run the
+    // scripts (and the lib/db modules they import) without tsx.
+    "allowImportingTsExtensions": true,
     "forceConsistentCasingInFileNames": true,
     // Same `@/` alias as vitest.config.ts and the target Next.js app.
     "paths": {
