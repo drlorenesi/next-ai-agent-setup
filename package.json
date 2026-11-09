@@ -1,0 +1,34 @@
+{
+  "name": "next-ai-agent-setup",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "description": "Setup guide and drop-in files for a Next.js 16 app with Better Auth, custom DB modules and AI agent tooling. Dependencies here only cover running the db tests and checks.",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "db:setup": "node --env-file-if-exists=.env.local scripts/setup-db.ts",
+    "db:check": "tsx --env-file-if-exists=.env.local scripts/check-db.ts",
+    "db:check-postgres": "tsx --env-file-if-exists=.env.local scripts/check-postgres.ts",
+    "db:check-mysql": "tsx --env-file-if-exists=.env.local scripts/check-mysql.ts",
+    "db:check-mssql": "tsx --env-file-if-exists=.env.local scripts/check-mssql.ts",
+    "typecheck": "tsc -p ."
+  },
+  "dependencies": {
+    "mssql": "^12.7.14",
+    "mysql2": "^3.24.6",
+    "pg": "^8.23.1",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/mssql": "^12.3.0",
+    "@types/node": "^26.6.6",
+    "@types/pg": "^8.23.1",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vitest": "^5.1.0"
+  }
+}

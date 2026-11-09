@@ -1,0 +1,35 @@
+{
+  // Type-checks the parts of this repo that can run here: the db modules,
+  // check scripts and tests. Run with `npm run typecheck`.
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "preserve",
+    "moduleResolution": "bundler",
+    "types": ["node"],
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "erasableSyntaxOnly": true,
+    "forceConsistentCasingInFileNames": true,
+    // Same `@/` alias as vitest.config.ts and the target Next.js app.
+    "paths": {
+      "@/*": ["./*"]
+    }
+  },
+  "include": ["lib/**/*.ts", "scripts/**/*.ts", "tests/**/*.ts", "vitest.config.ts"],
+  // Drop-in files for the Next.js app. They import next, better-auth, react
+  // and nodemailer, which are not installed in this repo.
+  "exclude": [
+    "node_modules",
+    "lib/auth.ts",
+    "lib/auth-client.ts",
+    "lib/email.ts",
+    "lib/safe-action.ts",
+    "lib/session.ts"
+  ]
+}
