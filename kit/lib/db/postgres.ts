@@ -9,6 +9,7 @@
 // transaction-mode pooler in front of the app for scale reasons, consider
 // pushing the relevant timeouts into the server-side defaults instead of
 // relying on per-session SET. See docs/db-modules/postgres-testing-report.md
+// in https://github.com/drlorenesi/next-ai-agent-setup
 // for the trade-off table.
 
 import { Pool, type PoolClient, type PoolConfig } from "pg"

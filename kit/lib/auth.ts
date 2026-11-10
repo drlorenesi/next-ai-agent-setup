@@ -75,8 +75,9 @@ export const auth = betterAuth({
     },
   },
 
-  // Email links point straight at the app's Spanish pages (see "Routes" in
-  // README.md). The page reads ?token= and calls authClient.resetPassword /
+  // Email links point straight at the app's Spanish pages (see "Routes" in the
+  // kit's guide: https://github.com/drlorenesi/next-ai-agent-setup#routes).
+  // The page reads ?token= and calls authClient.resetPassword /
   // authClient.verifyEmail. Better Auth's own endpoints keep their English
   // paths under /api/auth (e.g. "/sign-in/email" above): those are fixed.
   emailAndPassword: {

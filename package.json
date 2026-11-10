@@ -10,12 +10,12 @@
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
-    "db:setup": "node --env-file-if-exists=.env.local scripts/setup-db.ts",
-    "db:cleanup": "node --env-file-if-exists=.env.local scripts/cleanup-auth.ts",
-    "db:check": "node --env-file-if-exists=.env.local scripts/check-db.ts",
-    "db:check-postgres": "node --env-file-if-exists=.env.local scripts/check-postgres.ts",
-    "db:check-mysql": "node --env-file-if-exists=.env.local scripts/check-mysql.ts",
-    "db:check-mssql": "node --env-file-if-exists=.env.local scripts/check-mssql.ts",
+    "db:setup": "node --env-file-if-exists=.env.local kit/scripts/setup-db.ts",
+    "db:cleanup": "node --env-file-if-exists=.env.local kit/scripts/cleanup-auth.ts",
+    "db:check": "node --env-file-if-exists=.env.local kit/scripts/check-db.ts",
+    "db:check-postgres": "node --env-file-if-exists=.env.local kit/scripts/check-postgres.ts",
+    "db:check-mysql": "node --env-file-if-exists=.env.local kit/scripts/check-mysql.ts",
+    "db:check-mssql": "node --env-file-if-exists=.env.local kit/scripts/check-mssql.ts",
     "typecheck": "tsc -p ."
   },
   "dependencies": {

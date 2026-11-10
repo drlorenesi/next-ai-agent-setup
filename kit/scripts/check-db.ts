@@ -23,7 +23,7 @@ for (const check of CHECKS) {
   }
   // Partially configured: run anyway so the module reports exactly what's missing.
   // Same Node binary as this process; .env.local is already in process.env.
-  const result = spawnSync(process.execPath, [join("scripts", check.script)], {
+  const result = spawnSync(process.execPath, [join(import.meta.dirname, check.script)], {
     stdio: "inherit",
     env: process.env,
   })

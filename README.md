@@ -1,15 +1,32 @@
 # Next.js App Setup & AI Agent Guide
 
 - **Primary editor:** VS Code
+- **Version:** 1.0.0
 - **AI assistant:** Claude Code (the rules and skills also work with other agents that read `AGENTS.md` and the Agent Skills format)
 - **Framework:** Next.js 16.4 (App Router)
-- **Last update:** November 8, 2026
+- **Last update:** November 9, 2026
 
 This repository is a blueprint plus drop-in files for a new Next.js app built with an AI coding agent. It gives you three things:
 
 1. **An architecture** to build on: auth isolated on Neon Postgres, business data in MySQL and/or SQL Server through raw SQL modules, and a Spanish, mobile-first UI.
 2. **The agent skills** that matter for this stack: which vendor skills to install, which to add only when a trigger applies, and the project skills this kit ships.
 3. **MCP configuration, only if necessary.** The default is no MCP servers. Section 7 explains when one is worth its cost and how to add it safely.
+
+> **Who this README is for:** developers setting up a new app from the kit. You need two folders, `kit/` and `merge/`, and [Section 3](#3-project-setup) downloads both. The other files at the repository root are for maintaining the kit; if you change this repository or publish versions, read [MAINTAINING.md](MAINTAINING.md).
+
+## Contents
+
+1. [Architecture](#1-architecture): [principle](#principle-dual-database-isolation), [product rules](#product-rules), [security](#security), [tech stack](#tech-stack), [project structure](#project-structure), [routes](#routes), [forms](#forms), [database modules](#database-modules)
+2. [What this kit contains](#2-what-this-kit-contains): [only using some of the databases](#only-using-some-of-the-databases)
+3. [Project setup](#3-project-setup): [downloading the kit](#downloading-the-kit), [package.json and tsconfig.json](#packagejson-and-tsconfigjson), [script conventions](#script-conventions), [commands](#commands)
+4. [Tooling philosophy: skills vs. MCP](#4-tooling-philosophy-skills-vs-mcp)
+5. [Root context: AGENTS.md and CLAUDE.md](#5-root-context-agentsmd-and-claudemd)
+6. [Skills](#6-skills): [every project](#a-vendor-skills-install-for-every-project), [conditional](#b-conditional-vendor-skills-install-only-when-the-trigger-applies), [included in the kit](#c-project-skills-included-in-this-kit), [writing your own](#writing-your-own-skills)
+7. [MCP servers (only if necessary)](#7-mcp-servers-only-if-necessary)
+8. [Actionable errors and Instant Insights](#8-actionable-errors-and-instant-insights)
+9. [Testing](#9-testing)
+10. [Daily development workflow](#10-daily-development-workflow): [maintenance](#maintenance)
+11. [For maintainers](#11-for-maintainers)
 
 ---
 
@@ -63,7 +80,7 @@ Not covered by the kit, and worth doing before going live:
 | Business data        | Raw SQL via `mysql2` / `mssql`                                                        | Railway MySQL and/or local SQL Server                    | Kit's `db-query` **skill**; optional read-only database **MCP**        |
 | Compilation checks   | Next.js dev server (`/_next/mcp`)                                                     | Local (`next dev`)                                       | Used by the `next-dev-loop` skill; optional Next.js DevTools **MCP**   |
 | Runtime verification | agent-browser + `next-dev-loop`                                                       | Local (global npm install)                               | The agent drives a real browser: DOM, console, network, React tree     |
-| Tooling              | TypeScript, ESLint, Prettier (Tailwind class sorting), Vitest                         | Local                                                    | `npm run typecheck`, `lint`, `test` after each change                  |
+| Tooling              | TypeScript, ESLint, Prettier (Tailwind class sorting)                                 | Local                                                    | `npm run typecheck`, `lint` after each change; `db:check` for the databases |
 
 ### Project structure
 
@@ -93,8 +110,6 @@ lib/
   db/                 mysql.ts, postgres.ts, mssql.ts, db-types.ts
 db/                   SQL: auth schema, read-only agent users
 scripts/              db:setup, db:cleanup and db:check-* (plain node)
-tests/                Vitest unit tests
-docs/                 Design notes and testing reports
 ```
 
 App code imports with the `@/` alias, e.g. `@/components/ui/button`. Server code imports `@/lib/auth`; client code imports `@/lib/auth-client`, never the other way round.
@@ -135,10 +150,10 @@ Three TCP connection modules in `lib/db/` share one pattern: a lazy singleton po
 | `lib/db/postgres.ts` | `getPool()`, `getConnection(ms?)`, `runQuery()`             | `DATABASE_URL`                           |
 | `lib/db/mssql.ts`    | `getPool()` **(async: must `await`)**, `runQuery()`         | `MSSQL_HOST/PORT/DATABASE/USER/PASSWORD` |
 
-- `runQuery(sql, params?)` returns the driver-agnostic `QueryOutcome` from `lib/db/db-types.ts`: `kind: "rows"` or `kind: "ok"`, with every cell a `string | null`. See [docs/db-modules/query-abstraction.md](docs/db-modules/query-abstraction.md).
+- `runQuery(sql, params?)` returns the driver-agnostic `QueryOutcome` from `lib/db/db-types.ts`: `kind: "rows"` or `kind: "ok"`, with every cell a `string | null`. See [docs/db-modules/query-abstraction.md](docs/db-modules/query-abstraction.md) in this repository.
 - SQL Server has no `getConnection()` helper. Callers use `(await getPool()).request().query(...)`.
 - Better Auth uses the `postgres.ts` pool (`database: getPool()` in `lib/auth.ts`), so `DATABASE_URL` must be Neon's **direct** endpoint, with no `-pooler` in the hostname.
-- The testing reports in [docs/db-modules/](docs/db-modules/) record each driver's provider quirks.
+- The testing reports in this repository's [docs/db-modules/](docs/db-modules/) record each driver's provider quirks. They stay in the repository; they aren't copied into your app.
 
 **Why there's no Neon serverless module.** An earlier version had `lib/db/postgres-neon.ts` (`@neondatabase/serverless` over WebSockets, pooled endpoint). It was removed because Postgres only holds auth data, Better Auth already uses `postgres.ts`, and the pooled endpoint drops the session timeouts the modules rely on. `postgres.ts` therefore assumes:
 
@@ -152,24 +167,53 @@ If a deployment ever breaks one of these, bring back a WebSocket module on the p
 
 ## 2. What this kit contains
 
-| Kit path                                              | Copy to (new project)                                                         | Purpose                                                    |
-| :---------------------------------------------------- | :---------------------------------------------------------------------------- | :--------------------------------------------------------- |
-| `lib/auth.ts`, `lib/auth-client.ts`, `lib/session.ts` | `lib/`                                                                        | Better Auth server/client config and cached `getSession()` |
-| `lib/email.ts`                                        | `lib/`                                                                        | Nodemailer transport + Spanish verification/reset emails   |
-| `lib/auth-allowlist.ts`                               | `lib/`                                                                        | Sign-up email-domain allowlist (used by `lib/auth.ts`)     |
-| `lib/safe-action.ts`                                  | `lib/`                                                                        | `actionClient` / `diagnosticActionClient`                  |
-| `app/robots.ts`                                       | `app/`                                                                        | `robots.txt` asking all crawlers to stay out               |
-| `templates/next.config.ts`                            | `next.config.ts` (replaces the scaffold's)                                    | Security headers, `X-Robots-Tag`, `poweredByHeader: false` |
-| `lib/db/*`                                            | `lib/db/`                                                                     | Database connection modules                                |
-| `db/auth_schema.sql`                                  | `db/`                                                                         | Better Auth schema for Neon                                |
-| `db/readonly-users.sql`                               | `db/`                                                                         | SELECT-only users, only needed if you add a database MCP   |
-| `scripts/*`                                           | `scripts/`                                                                    | `db:setup`, `db:cleanup` and the `db:check-*` smoke checks  |
-| `tests/`, `vitest.config.ts`                          | project root                                                                  | Unit tests for the db modules and the sign-up allowlist    |
-| `.env.example`                                        | project root, then `cp .env.example .env.local`                               | All environment variables                                  |
-| `templates/AGENTS.md`                                 | append to `AGENTS.md`, below the Next.js block                                | Always-loaded project rules                                |
-| `templates/CLAUDE.md`                                 | `CLAUDE.md`                                                                   | Claude Code entry point (`@AGENTS.md`)                     |
-| `skills/*`                                            | `.claude/skills/` (Claude Code) or your agent's skills directory              | Project skills                                             |
-| `docs/db-modules/*`                                   | `docs/db-modules/`                                                            | Design notes and testing reports for the db modules        |
+You need two folders from this repository: `kit/` and `merge/`. Everything else (`docs/`, `tests/`, `package.json`, `tsconfig.json`, `vitest.config.ts`, `AGENTS.md`, `.github/`) is for maintaining the kit. It is never copied into your app, and you can ignore it.
+
+**`kit/`** mirrors a new app's root exactly. Download it into the project and every file lands where it belongs. Nothing in it overwrites a file the scaffold creates.
+
+```
+kit/
+  .claude/skills/       Project skills: db-query, server-action-form, new-feature-module, responsive-check
+  app/robots.ts         robots.txt asking all crawlers to stay out
+  db/
+    auth_schema.sql     Better Auth schema for Neon (npm run db:setup)
+    readonly-users.sql  SELECT-only users, only needed if you add a database MCP
+  lib/
+    auth.ts             Better Auth server config (rate limits, allowlist hook, email links)
+    auth-client.ts      Better Auth client
+    auth-allowlist.ts   Sign-up email-domain allowlist
+    session.ts          Cached getSession()
+    email.ts            Nodemailer transport + Spanish verification/reset emails
+    safe-action.ts      actionClient / diagnosticActionClient (admin-only)
+    db/                 postgres.ts, mysql.ts, mssql.ts, db-types.ts
+  scripts/              db:setup, db:cleanup and the db:check-* smoke checks
+  .env.example          All environment variables
+  CLAUDE.md             Claude Code entry point (@AGENTS.md)
+```
+
+**`merge/`** holds the files a fresh scaffold already has. Merge each one by hand:
+
+| File                   | What to do with it                                                                                  |
+| :--------------------- | :-------------------------------------------------------------------------------------------------- |
+| `merge/AGENTS.md`      | Append to the app's `AGENTS.md`, below the block `next dev` manages ([Section 5](#5-root-context-agentsmd-and-claudemd)) |
+| `merge/next.config.ts` | Replace the scaffold's `next.config.ts`, or merge it if the scaffold set options: security headers, `X-Robots-Tag`, `poweredByHeader: false` |
+| `merge/package.json`   | Add its `type`, `engines` and `scripts` to the app's `package.json`                                  |
+
+### Only using some of the databases
+
+Postgres is required, because Better Auth runs on it. MySQL and SQL Server are optional. After downloading the kit, delete the files for any business database you don't use, and skip its npm packages in setup step 3:
+
+| Database   | Files to delete                               | npm packages to skip    |
+| :--------- | :-------------------------------------------- | :---------------------- |
+| MySQL      | `lib/db/mysql.ts`, `scripts/check-mysql.ts`   | `mysql2`                |
+| SQL Server | `lib/db/mssql.ts`, `scripts/check-mssql.ts`   | `mssql`, `@types/mssql` |
+
+Then remove that database's:
+- `MYSQL_*` / `MSSQL_*` section from `.env.example` and `.env.local`;
+- entry in the `CHECKS` list in `scripts/check-db.ts`;
+- `db:check-mysql` / `db:check-mssql` script in `package.json`;
+- section in `db/readonly-users.sql`;
+- row in the `db-query` skill's module table.
 
 ---
 
@@ -187,36 +231,61 @@ npx next upgrade
 npm run typecheck && npm run build
 
 # 3. Add the form primitives and dependencies
+#    (skip mysql2 or mssql/@types/mssql if you don't use that database)
 npx shadcn@latest add form input button
 npm install @hookform/resolvers better-auth zod pg mysql2 mssql next-safe-action nodemailer
-npm install -D @types/pg @types/mssql @types/nodemailer vitest
+npm install -D @types/pg @types/mssql @types/nodemailer
 
 # 4. Boot the dev server once so `next dev` writes the managed block in
 #    AGENTS.md (see Section 5). Stop it with Ctrl+C.
 npm run dev
 
-# 5. Copy the kit files (from the new project's root, kit checked out next to it)
-KIT=../next-ai-agent-setup
-mkdir -p lib/db db scripts tests .claude/skills docs
-cp -R $KIT/lib/. lib/ && cp -R $KIT/db/. db/ && cp -R $KIT/scripts/. scripts/
-cp -R $KIT/tests/. tests/ && cp $KIT/vitest.config.ts . && cp -R $KIT/docs/. docs/
-cp $KIT/.env.example . && cp .env.example .env.local
-cp $KIT/app/robots.ts app/ && cp $KIT/templates/next.config.ts next.config.ts
-cp -R $KIT/skills/. .claude/skills/
-cat $KIT/templates/AGENTS.md >> AGENTS.md
-cp $KIT/templates/CLAUDE.md CLAUDE.md
+# 5. Download the kit into the project root (adds files, overwrites none of
+#    the scaffold's), and the merge files into a temporary folder
+npx giget@latest gh:drlorenesi/next-ai-agent-setup/kit#v1.0.0 . --force
+npx giget@latest gh:drlorenesi/next-ai-agent-setup/merge#v1.0.0 .kit-merge
 
-# 6. Fill in .env.local, add the package.json and tsconfig.json settings
-#    below, then create the auth schema and check every configured database
+# 6. Merge (see "What this kit contains"), then remove the temporary folder
+cat .kit-merge/AGENTS.md >> AGENTS.md
+cp .kit-merge/next.config.ts next.config.ts     # or merge by hand
+#    add .kit-merge/package.json's type/engines/scripts to package.json
+#    in tsconfig.json, add  "allowImportingTsExtensions": true  to compilerOptions
+rm -rf .kit-merge
+
+# 7. Fill in .env.local, then create the auth schema and check every
+#    configured database
+cp .env.example .env.local
 npm run db:setup && npm run db:check
 
-# 7. Verify, then put it under Git
-npm run typecheck && npm run build && npm test
+# 8. Verify, then put it under Git
+npm run typecheck && npm run build
 git init && git add . && git commit -m "Initial commit."
 git remote add origin https://github.com/<you>/<project-name>.git
 git branch -M main
 git push -u origin main
 ```
+
+### Downloading the kit
+
+Step 5 uses [giget](https://github.com/unjs/giget), a small tool that downloads one folder of a GitHub repository without cloning it: no `.git` folder and no history, only the files. `npx giget@latest` runs it without installing anything. Here's what each part of the first command does:
+
+```bash
+npx giget@latest gh:drlorenesi/next-ai-agent-setup/kit#v1.0.0 . --force
+```
+
+| Part                                  | Meaning                                                                                                          |
+| :------------------------------------ | :--------------------------------------------------------------------------------------------------------------- |
+| `gh:drlorenesi/next-ai-agent-setup`   | The GitHub repository (`gh:` = GitHub, then owner/repository)                                                     |
+| `/kit`                                | Only this folder of the repository                                                                               |
+| `#v1.0.0`                             | Which version: a release tag. `#main` gets the latest, unreleased state                                           |
+| `.`                                   | Where to put the files: the current folder, i.e. the project root                                                 |
+| `--force`                             | Allow a folder that isn't empty. Files from the kit are added; files already there that the kit doesn't have are kept |
+
+The second command downloads `merge/` the same way into a new `.kit-merge` folder. That folder doesn't exist yet, so it needs no `--force`. You merge its files by hand in step 6 and then delete it.
+
+- **Why a version tag?** Pinning `#v1.0.0` gives you the kit exactly as these instructions describe it, even if the repository changes later. The README on GitHub always shows the latest version number to use.
+- **Without giget**, clone the repository next to the project and copy instead: `cp -R ../next-ai-agent-setup/kit/. .`. The merge files are in `../next-ai-agent-setup/merge/`.
+- **As a zip:** each [release](https://github.com/drlorenesi/next-ai-agent-setup/releases) also has a `next-ai-agent-setup-<version>.zip` with both folders, for downloading by hand.
 
 Upgrade notes:
 
@@ -227,24 +296,14 @@ Upgrade notes:
 
 ### package.json and tsconfig.json
 
-Add to `package.json`:
+- **`package.json`:** `merge/package.json` holds what to add: `"type": "module"`, `"engines": { "node": ">=22.18" }`, and the `db:setup`, `db:cleanup` and `db:check*` scripts.
+- **`tsconfig.json`:** add one option to the existing `compilerOptions`, and keep everything the scaffold set:
 
-```json
-"type": "module",
-"engines": { "node": ">=22.18" },
-"scripts": {
-  "test": "vitest run",
-  "test:watch": "vitest",
-  "db:setup": "node --env-file-if-exists=.env.local scripts/setup-db.ts",
-  "db:cleanup": "node --env-file-if-exists=.env.local scripts/cleanup-auth.ts",
-  "db:check": "node --env-file-if-exists=.env.local scripts/check-db.ts",
-  "db:check-postgres": "node --env-file-if-exists=.env.local scripts/check-postgres.ts",
-  "db:check-mysql": "node --env-file-if-exists=.env.local scripts/check-mysql.ts",
-  "db:check-mssql": "node --env-file-if-exists=.env.local scripts/check-mssql.ts"
-}
-```
+  ```json
+  "allowImportingTsExtensions": true
+  ```
 
-Add `"allowImportingTsExtensions": true` to `compilerOptions` in `tsconfig.json`.
+  The kit's relative imports end in `.ts` (see [Script conventions](#script-conventions)). Without this option, `npm run typecheck` and `next build` reject them.
 
 `"type": "module"` makes every `.js`/`.ts` file an ES module. The scaffold already uses ESM configs. If you add a config that uses `module.exports`, name it `.cjs`.
 
@@ -252,7 +311,7 @@ Add `"allowImportingTsExtensions": true` to `compilerOptions` in `tsconfig.json`
 
 Scripts are TypeScript and use Node's built-in features instead of extra packages:
 
-- **Node runs TypeScript natively** (type stripping, on by default since Node 22.18). Every script runs with plain `node`: no `tsx`, no `ts-node`. Scripts, and the `lib/` modules they import, may only use TypeScript syntax that can simply be deleted: no `enum`, no namespaces, no constructor parameter properties. `erasableSyntaxOnly` in `tsconfig.json` enforces this.
+- **Node runs TypeScript natively** (type stripping, on by default since Node 22.18). Every script runs with plain `node`: no `tsx`, no `ts-node`. Scripts, and the `lib/` modules they import, may only use TypeScript syntax that can simply be deleted: no `enum`, no namespaces, no constructor parameter properties. Node refuses to run a script that uses them.
 - **Relative imports include the `.ts` extension** (`from "./db-types.ts"`). Node doesn't guess extensions, which is why `allowImportingTsExtensions` is needed. Next.js already sets `noEmit`, which that option requires. Plain Node doesn't understand the `@/` alias, so code that scripts import uses relative paths.
 - **`.env.local` is loaded with `--env-file-if-exists`.** It's built into Node, so `dotenv` isn't needed.
 - **Use `import.meta.dirname`** instead of the `fileURLToPath(import.meta.url)` workaround.
@@ -267,7 +326,6 @@ npm run start              # Production server
 npm run lint               # ESLint
 npm run format             # Prettier (with Tailwind CSS plugin)
 npm run typecheck          # TypeScript
-npm test                   # Vitest unit tests (no database needed)
 npm run db:setup           # Apply db/auth_schema.sql to Neon (idempotent)
 npm run db:cleanup         # Delete stale rate-limit rows, expired sessions/tokens (run daily)
 npm run db:check           # Smoke-check every configured database
@@ -307,11 +365,11 @@ Two files, two owners.
 **`AGENTS.md` is owned by Next.js.** `next dev` writes and maintains a managed block between `<!-- BEGIN:nextjs-agent-rules -->` and `<!-- END:nextjs-agent-rules -->`. It warns that this Next.js version has breaking changes and points the agent at the bundled docs.
 
 - The block is only written when `next dev` detects an AI coding agent and the markers aren't already there.
-- Everything outside the markers is preserved, so the project rules from `templates/AGENTS.md` go **below** the block.
+- Everything outside the markers is preserved, so the project rules from `merge/AGENTS.md` go **below** the block.
 - **Commit the block as-is**, even when it shows up as an uncommitted change. Removing it only makes `next dev` write it again.
 - To opt out, set `agentRules: false` in `next.config.ts`.
 
-**`CLAUDE.md` is owned by you.** Claude Code reads `CLAUDE.md`, not `AGENTS.md`, and the scaffold doesn't create it. `templates/CLAUDE.md` is a single `@AGENTS.md` import, so Claude Code loads the same rules as every other agent. Don't duplicate rules between the two files. If you ever need Claude-only directives, add them below the import.
+**`CLAUDE.md` is owned by you.** Claude Code reads `CLAUDE.md`, not `AGENTS.md`, and the scaffold doesn't create it. `kit/CLAUDE.md` is a single `@AGENTS.md` import, so Claude Code loads the same rules as every other agent. Don't duplicate rules between the two files. If you ever need Claude-only directives, add them below the import.
 
 > A symlink (`ln -s AGENTS.md CLAUDE.md`) also works, but only while `CLAUDE.md` has no Claude-specific content. The import keeps that option open.
 
@@ -376,7 +434,7 @@ npx skills add vercel/next.js --skill next-partial-prefetching-adoption # shared
 
 ### C. Project skills included in this kit
 
-Copied to `.claude/skills/` in step 5 of the setup:
+Downloaded with the kit into `.claude/skills/` (setup step 5):
 
 | Skill                | Triggers on                    | What it enforces                                                                                                                                                                                      |
 | :------------------- | :----------------------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -402,7 +460,7 @@ description: Write SQL against the app's databases using the lib/db modules ... 
 
 - The `description` is all the agent sees before deciding to load the skill. Say **what** it does and **when** to use it, in the words a request would actually contain ("form", "page", "query", "responsive").
 - Keep the body procedural: file layout, a code template, a checklist. Reference project files by path instead of pasting them.
-- Claude Code loads project skills from `.claude/skills/<name>/SKILL.md`. Other agents have their own skills directory. For an agent without skill support, list the skill paths in `AGENTS.md` ("before building a form, read `skills/server-action-form/SKILL.md`").
+- Claude Code loads project skills from `.claude/skills/<name>/SKILL.md`. Other agents have their own skills directory. For an agent without skill support, list the skill paths in `AGENTS.md` ("before building a form, read `.claude/skills/server-action-form/SKILL.md`").
 - Add a skill when you catch yourself correcting the agent on the same thing twice. Edit one when its output drifts from what you want.
 
 ---
@@ -507,16 +565,17 @@ How this fits the agent workflow:
 
 ## 9. Testing
 
-Two layers answer different questions:
+Your app gets **smoke checks**: scripts that connect to your real databases and confirm each `lib/db` module works against them.
 
-| Layer               | Command            | Needs a DB?            | Answers                                                                                                                                                         |
-| :------------------ | :----------------- | :--------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Unit tests (Vitest) | `npm test`         | No: drivers are mocked | Is each module configured correctly? (env validation, TLS options, pool sizing, precision flags, singleton/HMR behavior, timeout and release paths, `runQuery`, sign-up allowlist) |
-| Smoke checks        | `npm run db:check` | Yes: uses `.env.local` | Does it work against the real server? (connectivity, version, BIGINT precision, session timeouts and app name, pool concurrency, acquire timeout)               |
+| Command                                            | Checks                                                                                                                       |
+| :------------------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------- |
+| `npm run db:check`                                 | Every database configured in `.env.local`; skips the rest                                                                    |
+| `npm run db:check-postgres` (`-mysql`, `-mssql`)   | One database: connectivity, server version, BIGINT precision, session timeouts and app name, pool concurrency, acquire timeout |
 
-- Run `npm test` after any change in `lib/`. Run `npm run db:check` on a new machine, after changing `.env.local`, or before debugging "the query is broken", because the cause is often the connection.
-- `db:check` runs only the databases whose variables are set and skips the rest. Each `db:check-*` exits non-zero on failure and prints a hint for common errors (refused connection, bad credentials, untrusted certificate, wrong Neon endpoint).
-- Checks that need server introspection or Docker fixtures (SIGINT shutdown, `performance_schema`, killed connections) are listed as future work in the testing reports under `docs/db-modules/`.
+- Run `npm run db:check` on a new machine, after changing `.env.local`, after changing anything in `lib/db/`, or before debugging "the query is broken", because the cause is often the connection.
+- Each check exits non-zero on failure and prints a hint for common errors: refused connection, bad credentials, untrusted certificate, wrong Neon endpoint.
+
+**Unit tests stay in this repository.** The `lib/db` modules and the sign-up allowlist have unit tests (Vitest, drivers mocked, no database needed), but they test the kit itself, and the maintainers run them before every release. They aren't copied into your app, so your app doesn't need Vitest. The trade-off: if you change a `lib/db` module (pool sizes, timeouts, TLS), no unit test catches a regression. The app's `AGENTS.md` makes the agent ask before such changes, and `db:check` still verifies the result against the real server. If your app will change those modules often, copy the matching tests from this repository's [tests/](tests/) folder, install `vitest`, and add a `vitest.config.ts` with the `@/` alias.
 
 ---
 
@@ -556,7 +615,7 @@ npm run dev                                 # needed for next-dev-loop and /_nex
 
 - **Runtime:** ask the agent to verify each change with the `next-dev-loop` skill: reload the route, check the console and network, inspect the React tree. A green compile isn't a working page.
 - **Layout:** run the `responsive-check` skill on every page touched (360 / 768 / 1280 px, both themes).
-- **Build:** `npm test` (when `lib/` changed) and `npm run build` before you push. The production build catches things `dev` doesn't.
+- **Build:** `npm run db:check` (when `lib/db/` changed) and `npm run build` before you push. The production build catches things `dev` doesn't.
 - **By hand:** read all new user-facing text (Spanish, consistent tone, no English left in error paths), and try the unhappy paths: signed out, non-admin role, invalid input, empty results.
 
 ### 5. Review
@@ -574,7 +633,7 @@ git push -u origin HEAD                        # open a PR, merge when green
 - **Feed lessons back.** This takes two minutes and makes the next session faster:
   - The agent repeated a mistake → add one line to `AGENTS.md` or fix the skill.
   - You explained a multi-step procedure → it's a candidate for a new skill.
-  - A database quirk surprised you → note it in the module's testing report under `docs/db-modules/`.
+  - A database quirk surprised you → note it in a comment in the `lib/db` module, and tell the kit's maintainers so they can add it to the module's testing report.
 - Leave a one-line note in the PR or an issue saying where to pick up next time.
 
 ### Maintenance
@@ -583,3 +642,13 @@ git push -u origin HEAD                        # open a PR, merge when green
 - **Skills:** `npx skills update` upgrades installed skills and prunes retired ones.
 - **agent-browser:** `npm install -g agent-browser@latest` (stay on 0.27 or later for React introspection).
 - **Tooling audit:** before adding an MCP server, ask whether a skill plus a CLI command covers it. MCP tool definitions cost context in every session; skills cost context only when they're triggered.
+
+---
+
+## 11. For maintainers
+
+Everything above is for setting up an app. If you maintain this repository, [MAINTAINING.md](MAINTAINING.md) covers:
+
+- **Which files are yours:** the root tooling, the release workflow and the agent rules for working on the kit, as opposed to `kit/` and `merge/`, which users download.
+- **Your responsibilities:** keep `npm run typecheck && npm test` passing, keep `kit/` a mirror of the app, keep this README in sync and user-only, check vendor commands and Better Auth paths before releasing, and publish versions.
+- **How to release a version:** bump `package.json` and the README's `#v…` tags, push, then push a tag such as `v1.1.0` to run the release workflow.

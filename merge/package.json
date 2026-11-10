@@ -1,0 +1,14 @@
+{
+  "type": "module",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "db:setup": "node --env-file-if-exists=.env.local scripts/setup-db.ts",
+    "db:cleanup": "node --env-file-if-exists=.env.local scripts/cleanup-auth.ts",
+    "db:check": "node --env-file-if-exists=.env.local scripts/check-db.ts",
+    "db:check-postgres": "node --env-file-if-exists=.env.local scripts/check-postgres.ts",
+    "db:check-mysql": "node --env-file-if-exists=.env.local scripts/check-mysql.ts",
+    "db:check-mssql": "node --env-file-if-exists=.env.local scripts/check-mssql.ts"
+  }
+}

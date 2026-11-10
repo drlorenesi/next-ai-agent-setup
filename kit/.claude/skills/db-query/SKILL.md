@@ -61,4 +61,4 @@ Statements are capped at ~30 s (MySQL `MAX_EXECUTION_TIME`, Postgres `statement_
 
 ## Verify
 
-`npm run db:check` confirms connectivity and pool behavior; `npm test` covers module config.
+`npm run db:check` confirms connectivity, pool behavior and session settings against the real databases.

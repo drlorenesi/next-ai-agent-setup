@@ -3,9 +3,10 @@ import { defineConfig } from "vitest/config"
 
 export default defineConfig({
   resolve: {
-    // Mirror the tsconfig `@/` path alias (project root).
+    // The kit's unit tests (tests/) import kit modules as `@/lib/...`.
+    // `@/` = kit/, as in tsconfig.json. Tests are not shipped to apps.
     alias: [
-      { find: /^@\//, replacement: fileURLToPath(new URL("./", import.meta.url)) },
+      { find: /^@\//, replacement: fileURLToPath(new URL("./kit/", import.meta.url)) },
     ],
   },
   test: {

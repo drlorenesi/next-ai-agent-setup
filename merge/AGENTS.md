@@ -29,7 +29,7 @@
 - Imports use the `@/` alias.
 
 ### Workflow
-- After changes run `npm run typecheck && npm run lint`; run `npm test` when touching `lib/`.
+- After changes run `npm run typecheck && npm run lint`; run `npm run db:check` after touching `lib/db/`.
 - `npm run db:check` diagnoses database connectivity before you debug query code.
 - Never edit `.env.local` or print secrets; add new variables to `.env.example` with a comment.
 - Ask before adding a dependency, changing `lib/db/*` pool settings, or touching `db/auth_schema.sql`.

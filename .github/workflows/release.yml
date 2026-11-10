@@ -1,0 +1,46 @@
+# Publishes a GitHub release when a version tag is pushed:
+#   git tag v1.0.0 && git push origin v1.0.0
+# The release gets a zip with kit/ and merge/, for downloading without giget.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Check the tag matches package.json
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "Tag $GITHUB_REF_NAME doesn't match package.json version $version"
+            exit 1
+          fi
+
+      - name: Typecheck and test
+        run: |
+          npm ci
+          npm run typecheck
+          npm test
+
+      - name: Build the zip
+        run: zip -r "next-ai-agent-setup-$GITHUB_REF_NAME.zip" kit merge README.md LICENSE.txt
+
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" "next-ai-agent-setup-$GITHUB_REF_NAME.zip" \
+            --title "$GITHUB_REF_NAME" --generate-notes

@@ -1,6 +1,7 @@
 {
-  // Type-checks the parts of this repo that can run here: the db modules,
-  // check scripts and tests. Run with `npm run typecheck`.
+  // Type-checks the parts of kit/ that can run here (the db modules, the
+  // sign-up allowlist, scripts) and the kit's tests in tests/. Run with `npm run typecheck`.
+  // (Not part of the kit: the new app keeps its own tsconfig; see merge/.)
   "compilerOptions": {
     "target": "ES2022",
     "lib": ["ES2022"],
@@ -19,20 +20,25 @@
     // scripts (and the lib/db modules they import) without tsx.
     "allowImportingTsExtensions": true,
     "forceConsistentCasingInFileNames": true,
-    // Same `@/` alias as vitest.config.ts and the target Next.js app.
+    // `@/` = kit/, which mirrors the new app's root.
     "paths": {
-      "@/*": ["./*"]
+      "@/*": ["./kit/*"]
     }
   },
-  "include": ["lib/**/*.ts", "scripts/**/*.ts", "tests/**/*.ts", "vitest.config.ts"],
+  "include": [
+    "kit/lib/**/*.ts",
+    "kit/scripts/**/*.ts",
+    "tests/**/*.ts",
+    "vitest.config.ts"
+  ],
   // Drop-in files for the Next.js app. They import next, better-auth, react
   // and nodemailer, which are not installed in this repo.
   "exclude": [
     "node_modules",
-    "lib/auth.ts",
-    "lib/auth-client.ts",
-    "lib/email.ts",
-    "lib/safe-action.ts",
-    "lib/session.ts"
+    "kit/lib/auth.ts",
+    "kit/lib/auth-client.ts",
+    "kit/lib/email.ts",
+    "kit/lib/safe-action.ts",
+    "kit/lib/session.ts"
   ]
 }
